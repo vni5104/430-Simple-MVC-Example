@@ -3,8 +3,24 @@ const models = require('../models');
 
 const { Cat } = models;
 
-const hostIndex = (req, res) => {
+const hostIndex = async (req, res) => {
   let name = 'unknown';
+
+  try {
+    const doc = await Cat.findOne(
+      {}, //filter
+      {}, //fields
+      {sort: {dateCreated: 'descending'}} //options
+    ).lean().exec();
+
+    if (doc) {
+      name = doc.name;
+    }
+
+    console.log(doc);
+  } catch(err) {
+    console.log(err);
+  }
 
   res.render('index', {
     currentName: name,
@@ -36,8 +52,20 @@ const hostPage3 = (req, res) => {
   res.render('page3');
 };
 
-const getName = (req, res) => {
+const getName = async (req, res) => {
+  try {
+    const doc = await Cat.findOne({}).sort({dateCreated: 'descending'}).lean().exec();
 
+    if (!doc) {
+      return res.status(404).json({error: 'No Cat Found'});
+    }
+
+    return res.json({name: doc.name});
+  } catch(err) {
+    console.log(err);
+
+    return res.status(500).json({error: 'Something went wrong contacting DB'});
+  }
 };
 
 const setName = async (req, res) => {
@@ -67,14 +95,40 @@ const setName = async (req, res) => {
   }
 };
 
-const searchName = (req, res) => {
+const searchName = async (req, res) => {
   if (!req.query.name) {
     return res.status(400).json({ error: 'Name is required to perform a search' });
+  }
+
+  try {
+    const doc = await Cat.findOne({name: req.query.name}).select('name bedsOwned').exec();
+    
+    if (!doc) {
+      return res.status(404).json({error: 'No cat found'});
+    }
+    
+    return res.json({name: doc.name, beds: doc.bedsOwned});
+  } catch(err) {
+    console.log(err);
+    return res.status(500).json({error: 'Something went wrong'});
   }
 };
 
 const updateLast = (req, res) => {
-	
+	const updatePromise = Cat.findOneAndUpdate(
+    {}, //filter
+    { $inc: {bedsOwned: 1} }, //update
+    { returnDocument: 'after', sort: {dateCreated: 'descending'} } //option
+  ).lean().exec();
+
+  updatePromise.then((doc) => res.json({
+    name: doc.name,
+    beds: doc.bedsOwned
+  }))
+  .catch((err) => {
+    console.log(err);
+    return res.status(500).json({error: 'Something went wrong'});
+  });
 };
 
 const notFound = (req, res) => {
